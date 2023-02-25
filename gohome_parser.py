@@ -18,7 +18,7 @@ def get_all_last_flats_links(page_from=0, page_to=1):
             flat_links.append(a['href'])
         page_from += 1
     ready_links = list(map(lambda el: 'https://gohome.by'+el, flat_links))
-    print(ready_links)
+
     return ready_links
 
 
@@ -42,6 +42,7 @@ def enrich_links_to_flats(links):
         street = ''
         district = ''
         microdistrict = ''
+        date = datetime.now()
         for section in char_sections:
             try:
                 text = section.find('div', class_='name').text.strip()

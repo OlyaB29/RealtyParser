@@ -95,10 +95,10 @@ def enrich_links_to_flats(links):
 
 
 def save_flats(flats):
-    last_id = db_client.get_last_flat_id()
+
     for counter, flat in enumerate(flats):
         print(f'Загружено в базу {counter+1} из {len(flats)}')
-        db_client.insert_flat(flat, last_id+counter+1)
+        db_client.insert_flat(flat)
 
 
 def get_last_flats(page_from=0, page_to=10):
@@ -107,18 +107,6 @@ def get_last_flats(page_from=0, page_to=10):
     save_flats(flats)
 
 
-get_last_flats()
-# print(get_all_last_flats_links(page_from=0, page_to=1)[:2])
-
-def test():
-    resp = requests.get('https://realt.by/sale-flats/object/2369642/')
-    html = BeautifulSoup(resp.content, 'html.parser')
-    title = html.find('h1', class_='order-1').span.text.strip()
+# get_last_flats()
 
 
-
-
-
-    print(title)
-
-# test()
