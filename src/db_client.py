@@ -1,7 +1,11 @@
-import psycopg2
+import psycopg2, psycopg
 import requests
 import re
 from PIL import Image, ImageChops
+from progress.bar import ChargingBar
+from colorama import init, Fore
+
+init(autoreset=True)
 
 DBNAME = 'realty'
 USER = 'postgres'
@@ -104,41 +108,65 @@ def check_photos(links, photos, check_all):
     return flat_id, links_to_insert
 
 
-def check_flat_by_photo(flat):
+def check_flats_by_photo(flats, parser):
+    flats_to_insert = []
+    flats_to_update = []
+    update_id_list = []
+    image_links_list = []
     with psycopg2.connect(dbname=DBNAME, user=USER, password=PASSWORD, host=HOST) as conn:
         with conn.cursor() as cur:
-            cur.execute('''
-            SELECT id, street FROM flats WHERE street LIKE %s and city LIKE %s''',
-                        (f'%{street_format(flat.street)}%', f'%{city_format(flat.city)}%'))
-            such_street_flats = cur.fetchall()
-            # print(flat.street)
-            # print(such_street_flats)
-            if len(such_street_flats) == 0:
-                insert_flat(flat)
-                return
+            bar = ChargingBar(
+                f'{Fore.MAGENTA}Проверено квартир на совпадение фото в базе с сайта {Fore.BLUE} {parser} {Fore.RED}',
+                fill=' ⛪️', max=len(flats), suffix='%(index)d''/%(max)d'' | %(percent)d%%')
+            for flat in flats:
+                cur.execute('''
+                SELECT id, street FROM flats WHERE street LIKE %s and city LIKE %s''',
+                            (f'%{street_format(flat.street)}%', f'%{city_format(flat.city)}%'))
+                such_street_flats = cur.fetchall()
+                if len(such_street_flats) == 0:
+                    flats_to_insert.append(flat)
+                    bar.next()
+                    continue
 
-            id_list = [flat[0] for flat in such_street_flats]
-            cur.execute('''
-            SELECT id, flat, photo FROM photos WHERE flat in %s''', (tuple(id_list),))
-            such_street_photos = cur.fetchall()
+                id_list = [flat[0] for flat in such_street_flats]
+                cur.execute('''
+                SELECT id, flat, photo FROM photos WHERE flat in %s''', (tuple(id_list),))
+                such_street_photos = cur.fetchall()
 
-            flat_id, links_to_insert = check_photos(flat.image_links, such_street_photos, False)
+                if len(such_street_photos) == 0:
+                    flats_to_insert.append(flat)
+                    bar.next()
+                    continue
 
-            if flat_id != 0:
-                such_street_photos = list(filter(lambda el: el[1] == flat_id, such_street_photos))
-                links = flat.image_links[len(links_to_insert) + 1:]
-                links_to_insert += check_photos(links, such_street_photos, True)[1]
-                update_flat(flat, flat_id)
-                for link in links_to_insert:
-                    insert_photo(link, flat_id)
-            else:
-                insert_flat(flat)
+                flat_id, links_to_insert = check_photos(flat.image_links, such_street_photos, False)
+
+                if flat_id != 0:
+                    such_street_photos = list(filter(lambda el: el[1] == flat_id, such_street_photos))
+                    links = flat.image_links[len(links_to_insert) + 1:]
+                    links_to_insert += check_photos(links, such_street_photos, True)[1]
+                    flats_to_update.append(flat)
+                    update_id_list.append(flat_id)
+                    image_links_list.append(links_to_insert)
+                else:
+                    flats_to_insert.append(flat)
+                bar.next()
+            bar.finish()
+    if len(flats_to_insert):
+        insert_flats(flats_to_insert)
+    if len(flats_to_update):
+        update_flats(flats_to_update, update_id_list)
+    if len(image_links_list):
+        insert_photos(update_id_list, image_links_list)
 
 
-def update_flat(flat, flat_id):
-    with psycopg2.connect(dbname=DBNAME, user=USER, password=PASSWORD, host=HOST) as conn:
+def update_flats(flats, flat_id_list):
+    flats_list = [
+        (flat.link, flat.reference, flat.price, flat.title, flat.square, flat.city, flat.street, flat.district,
+         flat.microdistrict, flat.rooms_number, flat.year, flat.description, flat.seller_number, flat.date,
+         flat_id_list[counter]) for counter, flat in enumerate(flats)]
+    with psycopg.connect(dbname=DBNAME, user=USER, password=PASSWORD, host=HOST) as conn:
         with conn.cursor() as cur:
-            cur.execute('''
+            cur.executemany('''
                 UPDATE flats 
                 SET
                 link = %s,
@@ -156,16 +184,17 @@ def update_flat(flat, flat_id):
                 seller_number = %s,
                 date = %s
                 WHERE id = %s
-                 ''', (flat.link, flat.reference, flat.price, flat.title, flat.square, flat.city, flat.street,
-                       flat.district, flat.microdistrict, flat.rooms_number, flat.year, flat.description,
-                       flat.seller_number, flat.date, flat_id)
-                        )
+                 ''', flats_list)
 
 
-def insert_flat(flat):
-    with psycopg2.connect(dbname=DBNAME, user=USER, password=PASSWORD, host=HOST) as conn:
+def insert_flats(flats):
+    flats_list = [
+        (flat.link, flat.reference, flat.price, flat.title, flat.square, flat.city, flat.street, flat.district,
+         flat.microdistrict, flat.rooms_number, flat.year, flat.description, flat.seller_number, flat.date)
+        for flat in flats]
+    with psycopg.connect(dbname=DBNAME, user=USER, password=PASSWORD, host=HOST) as conn:
         with conn.cursor() as cur:
-            cur.execute('''
+            cur.executemany('''
                 INSERT INTO flats (link, reference, price, title, square, city, street, district,
                  microdistrict, rooms_number, year, description, seller_number, date) VALUES (%s, %s, %s, %s, %s, %s,
                   %s, %s, %s, %s, %s, %s, %s, %s)
@@ -184,36 +213,55 @@ def insert_flat(flat):
                 description = EXCLUDED.description,
                 seller_number = EXCLUDED.seller_number,
                 date = EXCLUDED.date
-                 ''', (flat.link, flat.reference, flat.price, flat.title, flat.square, flat.city, flat.street,
-                       flat.district, flat.microdistrict, flat.rooms_number, flat.year, flat.description,
-                       flat.seller_number, flat.date)
-                        )
-            cur.execute('''
-                SELECT id FROM flats WHERE link = %s''', (flat.link,))
-            output = cur.fetchone()
-            try:
-                flat_id = output[0]
-            except Exception as e:
-                print(e, 'Квартира не найдена')
-
-    if flat_id is not None:
-        for link in flat.image_links:
-            insert_photo(link, flat_id)
+                RETURNING id
+                 ''', flats_list, returning=True)
+            id_list = [cur.fetchone()[0]]
+            i = 1
+            while i < len(flats_list):
+                cur.nextset()
+                id_list.append(cur.fetchone()[0])
+                i += 1
+    links_list = [flat.image_links for flat in flats]
+    insert_photos(id_list, links_list)
 
 
-def insert_photo(image_link, flat_id):
-    # drawing = open(file_path, 'rb').read()
-    image = requests.get(image_link).content
+def insert_photos(flat_id_list, image_links_list):
+    photos_list = [(flat_id_list[counter], link, psycopg.Binary(requests.get(link).content))
+                   for counter, image_links in enumerate(image_links_list) for link in image_links]
     try:
-        with psycopg2.connect(dbname=DBNAME, user=USER, password=PASSWORD, host=HOST) as conn:
+        with psycopg.connect(dbname=DBNAME, user=USER, password=PASSWORD, host=HOST) as conn:
             with conn.cursor() as cur:
-                cur.execute('''
+                cur.executemany('''
                         INSERT INTO photos (flat, link, photo) VALUES (%s, %s, %s)   
                         ON CONFLICT (link) DO NOTHING            
-                         ''', (flat_id, image_link, psycopg2.Binary(image)))
-    except (Exception, psycopg2.DatabaseError) as error:
+                         ''', photos_list)
+    except (Exception, psycopg.DatabaseError) as error:
         print("Ошибка добавления данных в таблицу фото", error)
 
+
+# def get_all_not_posted_flats(parser_types):
+#     with psycopg2.connect(dbname=DBNAME, user=USER, password=PASSWORD, host=HOST) as conn:
+#         with conn.cursor() as cur:
+#             cur.execute('''
+#                     SELECT link, reference, price, title, description, date, photo_links, id FROM flats
+#                     WHERE (is_tg_posted = false or is_tg_posted IS NULL)
+#                     and reference IN %(parser_types)s
+#                  ''',
+#                         {'parser_types': tuple(parser_types)}
+#                         )
+#             return cur.fetchall()
 #
+#
+# def update_is_posted_state(ids):
+#     with psycopg2.connect(dbname=DBNAME, user=USER, password=PASSWORD, host=HOST) as conn:
+#         with conn.cursor() as cur:
+#             cur.execute('''
+#                     UPDATE flats SET
+#                     is_tg_posted = true
+#                     WHERE id = ANY(%s)
+#                  ''',
+#                         [ids, ]
+#                         )
+
 # create_flats_table()
 # create_photos_table()

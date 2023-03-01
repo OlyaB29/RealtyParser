@@ -1,12 +1,11 @@
-from base_parser import BaseParser
+from src.parsers.base_parser import BaseParser
 import re
 from datetime import datetime
 
 
 class RealtParser(BaseParser):
-    def __init__(self, page_start=0, page_end=1):
-        super().__init__('realt', 'https://realt.by/sale/flats/?page=', 'teaser-title', page_start=page_start,
-                         page_end=page_end)
+    def __init__(self, page_from=1, page_to=2):
+        super().__init__('realt', 'https://realt.by/sale/flats/?page=', 'teaser-title', page_from, page_to)
 
     def get_ready_links(self):
         flat_links = self.get_all_last_flats_links()

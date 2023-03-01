@@ -1,23 +1,23 @@
+from abc import ABC, abstractmethod
 import requests, threading
 from progress.bar import ChargingBar
 from bs4 import BeautifulSoup
 from datetime import datetime
-from data import Flat
-import db_client
+from src.data import Flat
+from src import db_client
 from colorama import init, Fore
-
 
 init(autoreset=True)
 
 lock = threading.RLock()
 
 
-class BaseParser:
-    def __init__(self, parser_name, main_link, a_class, page_start=0, page_end=1, n=1):
+class BaseParser(ABC):
+    def __init__(self, parser_name, main_link, a_class, page_from=1, page_to=2, n=1):
         self.parser_name = parser_name
         self.main_link = main_link
-        self.page_from = page_start
-        self.page_to = page_end
+        self.page_from = page_from
+        self.page_to = page_to
         self.a_class = a_class
         self.n = n
         self.start = 0
@@ -34,11 +34,13 @@ class BaseParser:
 
         return flat_links
 
+    @abstractmethod
     def get_ready_links(self):
-        return self.get_all_last_flats_links()
+        return []
 
+    @abstractmethod
     def get_flat_characteristics(self, html, characteristics):
-        return characteristics
+        return {}
 
     def enrich_links_to_flats(self, links):
         flats = []
@@ -71,33 +73,21 @@ class BaseParser:
                 reference=self.parser_name,
                 image_links=flat_characteristics['image_links']
             ))
-            # print(f'Спаршено {counter + 1} из {len(links)} {self.parser_name}')
             bar.next()
         bar.finish()
 
         return flats
 
     def save_flats(self, flats):
+        lock.acquire()
+        try:
+            db_client.check_flats_by_photo(flats, self.parser_name)
+        except Exception as e:
+            print("Ошибка добавления данных в базу", e)
+        finally:
+            lock.release()
 
-        bar = ChargingBar(
-            f'{Fore.MAGENTA}Загружено квартир в базу с сайта {Fore.BLUE} {self.parser_name} {Fore.RED}',
-            fill=' ⛪️', max=len(flats), suffix='%(index)d''/%(max)d'' | %(percent)d%%')
-        for counter, flat in enumerate(flats):
-            lock.acquire()
-            try:
-                # print(f'Загружено в базу {counter + 1} из {len(flats)} {self.parser_name}')
-                db_client.check_flat_by_photo(flat)
-                # db_client.insert_flat()
-                bar.next()
-            except Exception as e:
-                print("Ошибка добавления данных в таблицу квартир", e)
-            finally:
-                lock.release()
-        bar.finish()
-
-    def get_last_flats(self):
+    def update_with_last_flats(self):
         links = self.get_ready_links()[:3]
         flats = self.enrich_links_to_flats(links)
         self.save_flats(flats)
-
-

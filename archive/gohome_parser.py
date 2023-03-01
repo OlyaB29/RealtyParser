@@ -1,10 +1,9 @@
 import requests
 from bs4 import BeautifulSoup
-from data import Flat
+from src.data import Flat
 import re
 from datetime import datetime
-import db_client
-
+from src import db_client
 
 PARSER_NAME = 'gohome'
 
@@ -102,7 +101,7 @@ def save_flats(flats):
     last_id = db_client.get_last_flat_id()
     for counter, flat in enumerate(flats):
         print(f'Загружено в базу {counter+1} из {len(flats)}')
-        db_client.insert_flat(flat, last_id+counter+1)
+        db_client.insert_flat(flat, last_id + counter + 1)
 
 
 def get_last_flats(page_from=0, page_to=1):

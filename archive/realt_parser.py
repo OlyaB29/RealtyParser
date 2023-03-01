@@ -1,10 +1,9 @@
 import requests
 from bs4 import BeautifulSoup
-from data import Flat
+from src.data import Flat
 import re
 from datetime import datetime
-import db_client
-
+from src import db_client
 
 PARSER_NAME = 'realt'
 

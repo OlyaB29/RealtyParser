@@ -1,6 +1,6 @@
 import time, multiprocessing
-from realt_parser_class import RealtParser
-from gohome_parser_class import GohomeParser
+from src.parsers.realt_parser_class import RealtParser
+from src.parsers.gohome_parser_class import GohomeParser
 
 
 def parsing_run(page_start=0, page_end=1):
@@ -9,8 +9,8 @@ def parsing_run(page_start=0, page_end=1):
     realt_parser = RealtParser(page_start, page_end)
 
     if __name__ == '__main__':
-        gohome_process = multiprocessing.Process(target=gohome_parser.get_last_flats)
-        realt_process = multiprocessing.Process(target=realt_parser.get_last_flats)
+        gohome_process = multiprocessing.Process(target=gohome_parser.update_with_last_flats())
+        realt_process = multiprocessing.Process(target=realt_parser.update_with_last_flats())
         gohome_process.start()
         realt_process.start()
 

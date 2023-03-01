@@ -1,11 +1,11 @@
-from base_parser import BaseParser
+from src.parsers.base_parser import BaseParser
 import re
 from datetime import datetime
 
 
 class GohomeParser(BaseParser):
-    def __init__(self, page_start=0, page_end=1, n=30):
-        super().__init__('gohome', 'https://gohome.by/sale/index/', 'name__link', page_start=page_start, page_end=page_end, n=n)
+    def __init__(self, page_from=1, page_to=2, n=30):
+        super().__init__('gohome', 'https://gohome.by/sale/index/', 'name__link', page_from-1, page_to-1, n)
 
     def get_ready_links(self):
         flat_links = self.get_all_last_flats_links()
