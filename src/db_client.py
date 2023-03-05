@@ -49,6 +49,31 @@ def create_photos_table():
                 )''')
 
 
+def create_subscriptions_table():
+    with psycopg2.connect(dbname=DBNAME, user=USER, password=PASSWORD, host=HOST) as conn:
+        with conn.cursor() as cur:
+            cur.execute('''
+            CREATE TABLE IF NOT EXISTS subscriptions(
+                id serial PRIMARY KEY,
+                selection_field CHARACTER VARYING(15),
+                selection_value CHARACTER VARYING(500),
+                CONSTRAINT subs_unique UNIQUE (selection_field, selection_value)        
+                )''')
+
+
+def create_subscribers_table():
+    with psycopg2.connect(dbname=DBNAME, user=USER, password=PASSWORD, host=HOST) as conn:
+        with conn.cursor() as cur:
+            cur.execute('''
+            CREATE TABLE IF NOT EXISTS subscribers(
+                id serial PRIMARY KEY,
+                tg_id CHARACTER VARYING(20),
+                sub_id INTEGER,
+                FOREIGN KEY (sub_id) REFERENCES subscriptions (id)
+                CONSTRAINT subs_tg_unique UNIQUE (tg_id, sub_id)                
+                )''')
+
+
 def images_comparison(img1, img2):
     image_1 = Image.open(img1)
     image_2 = Image.open(img2)
@@ -120,7 +145,8 @@ def check_flats_by_photo(flats, parser):
                 fill=' ⛪️', max=len(flats), suffix='%(index)d''/%(max)d'' | %(percent)d%%')
             for flat in flats:
                 cur.execute('''
-                SELECT id, street FROM flats WHERE street LIKE %s and city LIKE %s''',
+                SELECT id, street FROM flats WHERE street LIKE %s and city LIKE %s and 
+                    (is_archive = false or is_archive IS NULL)''',
                             (f'%{street_format(flat.street)}%', f'%{city_format(flat.city)}%'))
                 such_street_flats = cur.fetchall()
                 if len(such_street_flats) == 0:
@@ -239,29 +265,128 @@ def insert_photos(flat_id_list, image_links_list):
         print("Ошибка добавления данных в таблицу фото", error)
 
 
-# def get_all_not_posted_flats(parser_types):
-#     with psycopg2.connect(dbname=DBNAME, user=USER, password=PASSWORD, host=HOST) as conn:
-#         with conn.cursor() as cur:
-#             cur.execute('''
-#                     SELECT link, reference, price, title, description, date, photo_links, id FROM flats
-#                     WHERE (is_tg_posted = false or is_tg_posted IS NULL)
-#                     and reference IN %(parser_types)s
-#                  ''',
-#                         {'parser_types': tuple(parser_types)}
-#                         )
-#             return cur.fetchall()
-#
-#
-# def update_is_posted_state(ids):
-#     with psycopg2.connect(dbname=DBNAME, user=USER, password=PASSWORD, host=HOST) as conn:
-#         with conn.cursor() as cur:
-#             cur.execute('''
-#                     UPDATE flats SET
-#                     is_tg_posted = true
-#                     WHERE id = ANY(%s)
-#                  ''',
-#                         [ids, ]
-#                         )
+def get_all_not_posted_flats(parser_types):
+    with psycopg2.connect(dbname=DBNAME, user=USER, password=PASSWORD, host=HOST) as conn:
+        with conn.cursor() as cur:
+            cur.execute('''
+                    SELECT id, link, reference, price, title, square, city FROM flats 
+                    WHERE (is_tg_posted = false or is_tg_posted IS NULL)
+                    AND reference IN %(parser_types)s 
+                 ''',
+                        {'parser_types': tuple(parser_types)}
+                        )
+            flats = cur.fetchall()[:3]
+            flats = list(map(lambda el: list(el), flats))
+            for flat in flats:
+                cur.execute('''
+                        SELECT flat, link FROM photos
+                        WHERE flat = %s
+                        LIMIT 3
+                    ''', (flat[0],)
+                            )
+                photos = cur.fetchall()
+                image_links = list(map(lambda el: el[1], photos))
+                flat.append(image_links)
+
+            return flats
+
+
+# get_all_not_posted_flats(['realt', 'gohome'])
+
+
+def update_is_posted_state(id_list):
+    with psycopg2.connect(dbname=DBNAME, user=USER, password=PASSWORD, host=HOST) as conn:
+        with conn.cursor() as cur:
+            cur.execute('''
+                    UPDATE flats 
+                    SET is_tg_posted = true
+                    WHERE id = ANY(%s)
+                 ''',
+                        [id_list, ]
+                        )
+
+
+def get_all_unarchived_flats():
+    with psycopg2.connect(dbname=DBNAME, user=USER, password=PASSWORD, host=HOST) as conn:
+        with conn.cursor() as cur:
+            cur.execute('''
+                    SELECT id, link FROM flats 
+                    WHERE (is_archive = false or is_archive IS NULL)
+                 ''')
+            return cur.fetchall()
+
+
+def update_is_archive_state(id_list):
+    with psycopg2.connect(dbname=DBNAME, user=USER, password=PASSWORD, host=HOST) as conn:
+        with conn.cursor() as cur:
+            cur.execute('''
+                    UPDATE flats 
+                    SET is_archive = true
+                    WHERE id = ANY(%s)
+                 ''',
+                        [id_list, ]
+                        )
+
+
+def add_subscription(subscription):
+    with psycopg2.connect(dbname=DBNAME, user=USER, password=PASSWORD, host=HOST) as conn:
+        with conn.cursor() as cur:
+            cur.execute('''
+                    INSERT INTO subscriptions (selection_field, selection_value) VALUES (%s, %s)
+                    ON CONFLICT (selection_field, selection_value) DO UPDATE 
+                    SET 
+                    selection_field=EXCLUDED.selection_field,
+                    selection_value=EXCLUDED.selection_value
+                    RETURNING id
+                ''', (subscription['type'], subscription['value']))
+            sub_id = cur.fetchone()[0]
+    print(sub_id)
+    add_subscriber(subscription['tg_id'], sub_id)
+
+
+def add_subscriber(tg_id, sub_id):
+    with psycopg2.connect(dbname=DBNAME, user=USER, password=PASSWORD, host=HOST) as conn:
+        with conn.cursor() as cur:
+            cur.execute('''
+                    INSERT INTO subscribers (tg_id, sub_id) VALUES (%s, %s)
+                    ON CONFLICT (tg_id, sub_id) DO NOTHING
+                ''', (tg_id, sub_id))
+
+
+def get_subscriptions(field):
+    with psycopg2.connect(dbname=DBNAME, user=USER, password=PASSWORD, host=HOST) as conn:
+        with conn.cursor() as cur:
+            cur.execute('''
+                     SELECT selection_value, tg_id, count(tg_id) OVER (PARTITION BY subscriptions.id)
+                     FROM subscriptions JOIN subscribers ON subscriptions.id=subscribers.sub_id
+                     WHERE selection_field = %s                
+                ''', (field,))
+
+            return cur.fetchall()
+
+
+def get_subscriptions_by_tg_id(tg_id):
+    with psycopg2.connect(dbname=DBNAME, user=USER, password=PASSWORD, host=HOST) as conn:
+        with conn.cursor() as cur:
+            cur.execute('''
+                     SELECT subscribers.id, selection_field, selection_value
+                     FROM subscriptions JOIN subscribers ON subscriptions.id=subscribers.sub_id
+                     WHERE tg_id = %s                
+                ''', (str(tg_id),))
+
+            return cur.fetchall()
+
+
+def delete_subscriber(id):
+    with psycopg2.connect(dbname=DBNAME, user=USER, password=PASSWORD, host=HOST) as conn:
+        with conn.cursor() as cur:
+            cur.execute('''
+                     DELETE FROM subscribers WHERE id = %s                
+                ''', (id,))
+
+
 
 # create_flats_table()
 # create_photos_table()
+# create_subscriptions_table()
+# create_subscribers_table()

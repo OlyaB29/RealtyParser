@@ -1,10 +1,8 @@
 import schedule
 import time
-from constants import USED_PARSERS
+from constants import USED_PARSERS, PARSE_EVERY_MINUTES
 import threading
 from datetime import datetime
-
-PARSE_EVERY_MINUTES = 3
 
 
 def parse_all():
