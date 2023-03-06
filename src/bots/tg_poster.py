@@ -1,9 +1,9 @@
 import telebot
 
 # http://t.me/newflats_poster_bot
-bot = telebot.TeleBot('6276931272:AAHTZRpY_xmi0GWo6QAnjI_n4P6L0oU7LQI')
+bot = telebot.TeleBot('токен')
 # https://t.me/+IhhOzPbh7jg4Y2Ey группа NewFlats group
-REPORT_GROUP_ID = '-1001821427441'
+REPORT_GROUP_ID = 'id группы'
 
 
 def send_tg_post(chat_id, message):

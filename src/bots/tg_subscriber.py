@@ -4,7 +4,7 @@ from src.runners.constants import SUBSCRIPTION_TYPES
 from src import db_client
 
 # http://t.me/newflats_subscriber_bot
-bot = telebot.TeleBot('5489624688:AAGWa7TITdX54a-pXQIv63XU5b6KgwqH2x8')
+bot = telebot.TeleBot('токен')
 
 subscription = {}
 
