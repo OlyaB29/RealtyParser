@@ -1,9 +1,7 @@
 import telebot
+from config import poster_TOKEN
 
-# http://t.me/newflats_poster_bot
-bot = telebot.TeleBot('токен')
-# https://t.me/+IhhOzPbh7jg4Y2Ey группа NewFlats group
-REPORT_GROUP_ID = 'id группы'
+bot = telebot.TeleBot(poster_TOKEN)
 
 
 def send_tg_post(chat_id, message):

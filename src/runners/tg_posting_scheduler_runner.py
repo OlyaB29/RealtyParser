@@ -1,7 +1,7 @@
 import schedule
 import time
 from constants import USED_PARSERS, SUBSCRIPTION_TYPES, POST_EVERY_MINUTES
-from src.bots.tg_poster import REPORT_GROUP_ID
+from src.bots.config import REPORT_GROUP_ID
 from src import db_client
 from src.bots import tg_poster
 from datetime import datetime

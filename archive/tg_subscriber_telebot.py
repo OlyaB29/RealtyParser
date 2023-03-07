@@ -2,9 +2,10 @@ import telebot
 from telebot import types
 from src.runners.constants import SUBSCRIPTION_TYPES
 from src import db_client
+from config import subscriber_TOKEN
 
-# http://t.me/newflats_subscriber_bot
-bot = telebot.TeleBot('токен')
+
+bot = telebot.TeleBot(subscriber_TOKEN)
 
 subscription = {}
 
