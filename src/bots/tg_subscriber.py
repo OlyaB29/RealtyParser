@@ -5,18 +5,22 @@ from aiogram.contrib.fsm_storage.memory import MemoryStorage
 import logging
 from src.runners.constants import SUBSCRIPTION_TYPES
 from src import db_client
-from config import subscriber_TOKEN
+from config import subscriber_TOKEN, UKassa_TOKEN
 
 logging.basicConfig(level=logging.INFO)
 storage = MemoryStorage()
 bot = Bot(token=subscriber_TOKEN)
 dp = Dispatcher(bot, storage=storage)
 
+PRICE = types.LabeledPrice(label="Оформление подписки", amount=500 * 100)  # в копейках (руб)
+PAYMENTS_TOKEN = UKassa_TOKEN
 
-class Sub_definition(StatesGroup):
+
+class SubDefinition(StatesGroup):
     sub_type = State()
     sub_value = State()
     sub_ok = State()
+    sub_pay = State()
 
 
 def create_keyboard(k, subs=None):
@@ -34,7 +38,7 @@ def create_keyboard(k, subs=None):
             type_btn = types.InlineKeyboardButton(text=sub_type[1], callback_data=sub_type[0])
             keyboard.add(type_btn)
     elif k == 'confirm':
-        conf_btn = types.InlineKeyboardButton(text="Подтвердить", callback_data='ok')
+        conf_btn = types.InlineKeyboardButton(text="Подтвердить и оплатить", callback_data='ok')
         back_btn = types.InlineKeyboardButton(text="Выбрать другую подписку", callback_data='subs')
         keyboard.add(conf_btn)
         keyboard.add(back_btn)
@@ -48,27 +52,26 @@ def create_keyboard(k, subs=None):
 
 @dp.message_handler(commands=['start'])
 async def start_bot(message: types.Message):
-    await message.answer('⛪ Здравствуйте, здесь вы можете оформить подписку на рассылку самых свежих '
+    await message.answer('⛪ Здравствуйте, здесь вы можете оформить платную подписку на рассылку самых свежих '
                          'объявлений о продаже квартир, отобранных по вашему критерию',
                          reply_markup=create_keyboard('main'))
 
 
-@dp.callback_query_handler(lambda call: True, state=Sub_definition.sub_type)
+@dp.callback_query_handler(lambda call: call.data in [sub_type[0] for sub_type in SUBSCRIPTION_TYPES], state=SubDefinition.sub_type)
 async def define_sub_type(call: types.CallbackQuery, state: FSMContext):
     if call.message:
         await bot.answer_callback_query(call.id)
-        if call.data in [sub_type[0] for sub_type in SUBSCRIPTION_TYPES]:
-            sub_type = list(filter(lambda el: el[0] == call.data, SUBSCRIPTION_TYPES))[0]
-            async with state.proxy() as data:
-                data['type'] = sub_type
-            await Sub_definition.next()
-            await bot.send_message(
-                chat_id=call.message.chat.id,
-                text=sub_type[2]
-            )
+        sub_type = list(filter(lambda el: el[0] == call.data, SUBSCRIPTION_TYPES))[0]
+        async with state.proxy() as data:
+            data['type'] = sub_type
+        await SubDefinition.next()
+        await bot.send_message(
+            chat_id=call.message.chat.id,
+            text=sub_type[2]
+        )
 
 
-@dp.message_handler(state=Sub_definition.sub_value)
+@dp.message_handler(state=SubDefinition.sub_value)
 async def define_sub_value(message: types.Message, state: FSMContext):
     if message.text == "/start":
         await start_bot(message)
@@ -78,24 +81,32 @@ async def define_sub_value(message: types.Message, state: FSMContext):
             data['value'] = message.text.title()
             to_send_message = 'Вы выбрали подписку ' + data['type'][1] + ': ' + data['value'] + \
                               '\n\nЕсли все верно, подтвердите'
-            data['type'] = data['type'][0]
-            await Sub_definition.next()
+            await SubDefinition.next()
             await message.answer(to_send_message, reply_markup=create_keyboard('confirm'), parse_mode='html')
 
 
-@dp.callback_query_handler(lambda call: True, state=Sub_definition.sub_ok)
-async def confirm_sub(call: types.CallbackQuery, state: FSMContext):
+@dp.callback_query_handler(lambda call: call.data == 'ok', state=SubDefinition.sub_ok)
+async def pay_sub(call: types.CallbackQuery, state: FSMContext):
     if call.message:
         await bot.answer_callback_query(call.id)
-        if call.data == "ok":
-            async with state.proxy() as data:
-                data['tg_id'] = call.message.chat.id
-                db_client.add_subscription(data)
-            await bot.send_message(
-                chat_id=call.message.chat.id,
-                text='Отлично, подписка оформлена!'
-            )
-            await state.finish()
+        await SubDefinition.next()
+        if PAYMENTS_TOKEN.split(':')[1] == 'TEST':
+            await bot.send_message(call.message.chat.id, "Тестовый платеж!!!")
+        async with state.proxy() as data:
+            await bot.send_invoice(call.message.chat.id,
+                                   title="Активация подписки на бота",
+                                   description="Подписка на рассылку объявлений о продаже квартир " + data['type'][1] +
+                                               ': ' + data['value'],
+                                   provider_token=PAYMENTS_TOKEN,
+                                   currency="rub",
+                                   photo_url="https://novostroev.ru/upload/iblock/4df/investicii_s_chego_nachat.jpg",
+                                   photo_width=416,
+                                   photo_height=234,
+                                   photo_size=416,
+                                   is_flexible=False,
+                                   prices=[PRICE],
+                                   start_parameter="one-month-subscription",
+                                   payload="test-invoice-payload")
 
 
 @dp.callback_query_handler(lambda call: True, state='*')
@@ -104,10 +115,10 @@ async def keyboard_answer(call: types.CallbackQuery, state: FSMContext):
         await bot.answer_callback_query(call.id)
         if call.data == "subs":
             await state.finish()
-            await Sub_definition.sub_type.set()
+            await SubDefinition.sub_type.set()
             await bot.send_message(
                 chat_id=call.message.chat.id,
-                text='Выберите тип подписки',
+                text='👇 Выберите тип подписки',
                 reply_markup=create_keyboard('types'))
         elif call.data == "unsubs":
             await state.finish()
@@ -120,9 +131,9 @@ async def keyboard_answer(call: types.CallbackQuery, state: FSMContext):
             else:
                 await bot.send_message(
                     chat_id=call.message.chat.id,
-                    text='Выберите подписку, от которой хотите отказаться',
+                    text='👇 Выберите подписку, от которой хотите отказаться',
                     reply_markup=create_keyboard('your_subs', subs))
-        else:
+        elif call.data.isdigit():
             db_client.delete_subscriber(int(call.data))
             await bot.send_message(
                 chat_id=call.message.chat.id,
@@ -130,5 +141,26 @@ async def keyboard_answer(call: types.CallbackQuery, state: FSMContext):
             )
 
 
+@dp.pre_checkout_query_handler(lambda query: True, state=SubDefinition.sub_pay)
+async def pre_checkout_query(pre_checkout_q: types.PreCheckoutQuery):
+    await bot.answer_pre_checkout_query(pre_checkout_q.id, ok=True)
+
+
+@dp.message_handler(content_types=types.message.ContentType.SUCCESSFUL_PAYMENT, state=SubDefinition.sub_pay)
+async def successful_payment(message: types.Message, state: FSMContext):
+    print("SUCCESSFUL PAYMENT:")
+    payment_info = message.successful_payment.to_python()
+    for k, v in payment_info.items():
+        print(f"{k} = {v}")
+
+    async with state.proxy() as data:
+        data['tg_id'] = message.chat.id
+        data['type'] = data['type'][0]
+        db_client.add_subscription(data)
+    await bot.send_message(message.chat.id, f"Платеж на сумму {message.successful_payment.total_amount // 100}"
+                                            f" {message.successful_payment.currency} прошел успешно!\nПодписка оформлена!!")
+    await state.finish()
+
+
 if __name__ == "__main__":
-    executor.start_polling(dp)
+    executor.start_polling(dp, skip_updates=False)

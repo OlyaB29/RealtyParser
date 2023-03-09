@@ -1,7 +1,7 @@
 import telebot
-from config import poster_TOKEN
+from src.bots.config import poster_TOKEN
 
-bot = telebot.TeleBot(poster_TOKEN)
+bot = telebot.TeleBot(token=poster_TOKEN)
 
 
 def send_tg_post(chat_id, message):
