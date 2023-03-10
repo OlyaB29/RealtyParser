@@ -1,0 +1,156 @@
+@import url('https://fonts.googleapis.com/css2?family=Black+And+White+Picture&family=Leckerli+One&family=Montserrat:wght@100;400;600&display=swap');
+@import 'https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css';
+
+
+* {
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Montserrat', sans-serif;
+    /*color: #14a60e;*/
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: #e8d1d1;
+    background-size: cover;
+}
+
+header {
+    background: url(img/medium_zhilaya_nedvizhimost_2948d5a1d0.jpeg) no-repeat center center;
+    width: 100%;
+    height: 300px;
+    background-size: cover;
+    position: fixed;
+}
+
+.header {
+    font-size: 28px;
+    padding-left: 100px;
+    padding-top: 100px;
+}
+
+.header p.first {
+    padding-top: 9px;
+    padding-left: 80px;
+}
+
+.header p.second {
+    padding-left: 180px;
+    font-size: 32px;
+    color: #ba2121;
+    font-weight: bolder;
+}
+
+.info {
+    padding-top: 350px;
+    padding-bottom: 30px;
+    margin: 0 auto;
+    width: 85%;
+}
+
+.info a {
+    color: #ba2121;
+    text-decoration: none;
+    font-weight: bolder;
+}
+
+.select {
+    background-color: #858181;
+    width: 100%;
+}
+
+.select-flat {
+    margin: 0 auto;
+    width: 65%;
+}
+
+h5 {
+    margin-bottom: 25px;
+    color: #410d0d;
+}
+
+.form-control, .btn {
+    border-radius: 10px;
+}
+
+.rooms, .btn {
+    width: 300px;
+}
+
+.btn {
+    background-color: #ad4a4a;
+}
+
+.btn:hover {
+    background-color: #6b5757;
+}
+
+main {
+    background-color: rgba(86, 3, 3, 0.96);
+    margin: 0 0;
+}
+
+.top {
+    padding-top: 10px;
+}
+
+.top li{
+    display: inline-block;
+    color: #6b6363;
+    font-size: 26px;
+}
+
+.h {
+    margin-left: 350px;
+}
+
+.top a {
+    color: #6b6363;
+    padding-left: 20px;
+    font-weight: bolder;
+}
+
+.flat {
+    background-color: rgba(138, 134, 134, 0.75);
+}
+
+.row {
+    width: 90%;
+    margin: 20px 50px 20px 50px;
+    padding-top: 20px;
+}
+
+.image {
+    width: 380px;
+    height: 250px;
+    margin: 7px;
+    display: inline-block;
+    cursor: pointer;
+}
+
+.image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.price {
+    font-size: 28px;
+}
+
+.flat-info p {
+    font-size: 18px;
+}
+
+.flat-info a, .top a {
+    text-decoration: none;
+}
+
+footer {
+    text-align: center;
+    margin-top: 30px;
+    font-weight: bolder;
+    text-decoration: none;
+    margin-bottom: 30px;
+}

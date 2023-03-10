@@ -1,0 +1,15 @@
+{% load static %}
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block tittle %} Информагенство Realty Info {% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'style.css' %}">
+</head>
+<body>
+    {% block content %} Приветствуем Вас в нашем информагенстве Realty Info {% endblock %}
+</body>
+<footer>
+    Все права защищены &copy;
+</footer>
+</html>

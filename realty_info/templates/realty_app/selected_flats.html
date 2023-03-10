@@ -1,0 +1,45 @@
+{% extends "index.html" %}
+{% load static %}
+
+{% block content %}
+<main>
+    {% if flats %}
+    <div class="top">
+        <ul>
+            <li><a href="{% url 'realty_app:info' %}">Realty Info</a></li>
+            <li class="h">Объявления по Вашему запросу:</li>
+        </ul>
+    </div>
+    <div class="flats">
+    {% for el in flats %}
+        <div class="flat">
+            <div class="row">
+                <div class="col-4">
+                    <div class="image">
+                        <a href="{{el.first_photo}}"><img src="{{el.first_photo}}" alt=""/></a>
+                    </div>
+                    {% if el.price > 0 %}
+                    <p class="price">{{el.price}} бел.руб</p>
+                    {% else %}
+                    <p class="price">Цена договорная</p>
+                    {% endif %}
+                </div>
+                <div class="col-8">
+                    <div class="flat-info">
+                    <a href="{{el.link}}"><h5>{{el.title}}</h5></a>
+                    <p>{{el.rooms_number}}-комнатная, {{el.square}} м², {{el.year}} г.</p>
+                    <p>{{el.city}}{% if el.district %}, {{el.district}}{% endif %}{% if el.microdistrict %}, {{el.microdistrict}}{% endif %}</p>
+                    <p>{{el.street}}</p>
+                    <p><small>Добавлено: {{el.date}}</small></p>
+                    </div>
+                </div>
+             </div>
+        </div>
+    {% endfor %}
+    {% else %}
+        <h3>По Вашему запросу объявлений не найдено</h3>
+    </div>
+    {% endif %}
+</main>
+
+{% endblock %}

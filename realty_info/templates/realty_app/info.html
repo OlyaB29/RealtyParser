@@ -1,0 +1,39 @@
+{% extends "index.html" %}
+{% load static %}
+
+{% block content %}
+<header>
+    <div class="header">
+        Приветствуем Вас
+        <p class="first"> в нашем информагенстве </p>
+        <p class="second"> Realty Info</p>
+    </div>
+</header>
+<div class="info">
+    <p><b>Если Вы ищите квартиру и не хотите пропустить появление свежих предложений продавцов, то Вы обратились по
+        адресу</b></p>
+    <p>Мы обладаем самой актуальной информацией о продаже квартир на таких ресурсах, как <b>realt.by</b> и
+        <b>gohome.by</b> и готовы делиться ею с Вами в режиме реального времени</p>
+    <p>Подпишитесь на нашу группу в телеграмме <a href="https://t.me/+IhhOzPbh7jg4Y2Ey">NewFlats group</a> и Вы точно
+        ничего не пропустите</p>
+    <p>А если хотите моментально узнавать о появлении в продаже квартир, наиболее подходящих именно Вам, за небольшую
+        плату оформите <a href="http://t.me/newflats_subscriber_bot">индивидуальную подписку</a> на рассылку в
+        телеграмме</p>
+</div>
+<div class="select">
+    <div class="select-flat p-5 text-bg-dark rounded-3">
+        <h5>Здесь прямо сейчас можете подобрать квартиры из свежих объявлений за последние три дня</h5>
+        <form method="post">
+            {% csrf_token %}
+            {{form.city}}<br>
+            {{form.district}}<br>
+            <div class="rooms">
+                {{form.rooms_number}}<br>
+            </div>
+            <button type="submit" class="btn btn-success">Посмотреть варианты</button>
+            <span>{{error}}</span>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
