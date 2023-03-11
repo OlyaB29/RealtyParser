@@ -88,6 +88,6 @@ class BaseParser(ABC):
             lock.release()
 
     def update_with_last_flats(self):
-        links = self.get_ready_links()[:3]
+        links = self.get_ready_links()[:10]
         flats = self.enrich_links_to_flats(links)
         self.save_flats(flats)

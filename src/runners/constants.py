@@ -5,7 +5,7 @@ realt_parser = RealtParser()
 gohome_parser = GohomeParser()
 USED_PARSERS = [realt_parser, gohome_parser]
 
-PARSE_EVERY_MINUTES = 3
+PARSE_EVERY_MINUTES = 5
 POST_EVERY_MINUTES = 1
 ARCHIVE_AT = '00:00'
 

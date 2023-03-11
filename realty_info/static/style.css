@@ -87,7 +87,7 @@ h5 {
 }
 
 main {
-    background-color: rgba(86, 3, 3, 0.96);
+    background-color: rgba(77, 3, 3, 0.96);
     margin: 0 0;
 }
 
@@ -97,6 +97,11 @@ main {
 
 .top li{
     display: inline-block;
+    color: #6b6363;
+    font-size: 26px;
+}
+
+h3 {
     color: #6b6363;
     font-size: 26px;
 }
@@ -112,7 +117,7 @@ main {
 }
 
 .flat {
-    background-color: rgba(138, 134, 134, 0.75);
+    background-color: rgba(220, 218, 218, 0.75);
 }
 
 .row {

@@ -275,7 +275,7 @@ def get_all_not_posted_flats(parser_types):
                  ''',
                         {'parser_types': tuple(parser_types)}
                         )
-            flats = cur.fetchall()[:3]
+            flats = cur.fetchall()[:10]
             flats = list(map(lambda el: list(el), flats))
             for flat in flats:
                 cur.execute('''

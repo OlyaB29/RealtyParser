@@ -25,8 +25,8 @@ def info(request):
             else:
                 rooms_number = [1,2,3,4,5]
 
-            flats = Flats.objects.filter(date__gte=datetime.datetime.today() - datetime.timedelta(days=3),
-                                         city__contains=city, district__contains=district, rooms_number__in=rooms_number)
+            flats = Flats.objects.filter(date__gte=datetime.datetime.today() - datetime.timedelta(days=3), is_archive=False,
+                                         city__contains=city, district__contains=district, rooms_number__in=rooms_number).order_by('-date')
 
             photos = Photos.objects.filter(flat=OuterRef("pk"))
             flats = flats.annotate(first_photo=Subquery(photos.values('link')[:1]),
