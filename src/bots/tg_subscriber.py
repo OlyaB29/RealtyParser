@@ -2,12 +2,16 @@ from aiogram import Bot, types, executor
 from aiogram.dispatcher import Dispatcher, FSMContext
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
-import logging
 from src.runners.constants import SUBSCRIPTION_TYPES
 from src import db_client
 from config import subscriber_TOKEN, UKassa_TOKEN
+from loggers import sentry_logger
+import logging
 
-logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger('tg_subscriber')
+logger.setLevel(logging.INFO)
+
+
 storage = MemoryStorage()
 bot = Bot(token=subscriber_TOKEN)
 dp = Dispatcher(bot, storage=storage)
@@ -77,12 +81,21 @@ async def define_sub_value(message: types.Message, state: FSMContext):
         await start_bot(message)
         await state.finish()
     else:
+        stop = False
         async with state.proxy() as data:
-            data['value'] = message.text.title()
-            to_send_message = 'Вы выбрали подписку ' + data['type'][1] + ': ' + data['value'] + \
+            if data['type'][0] == 'price':
+                try:
+                    value = float(message.text)
+                except (Exception, ValueError) as error:
+                    logger.exception(f'{error}. (Price value is uncorrect).\n')
+                    await message.answer("Введите стоимость цифрами")
+                    stop = True
+            if not stop:
+                data['value'] = message.text.title()
+                to_send_message = 'Вы выбрали подписку ' + data['type'][1] + ': ' + data['value'] + \
                               '\n\nЕсли все верно, подтвердите'
-            await SubDefinition.next()
-            await message.answer(to_send_message, reply_markup=create_keyboard('confirm'), parse_mode='html')
+                await SubDefinition.next()
+                await message.answer(to_send_message, reply_markup=create_keyboard('confirm'), parse_mode='html')
 
 
 @dp.callback_query_handler(lambda call: call.data == 'ok', state=SubDefinition.sub_ok)
@@ -135,6 +148,7 @@ async def keyboard_answer(call: types.CallbackQuery, state: FSMContext):
                     reply_markup=create_keyboard('your_subs', subs))
         elif call.data.isdigit():
             db_client.delete_subscriber(int(call.data))
+            logger.info(f'Deleting subscriber {call.data}, user {call.message.chat.id}')
             await bot.send_message(
                 chat_id=call.message.chat.id,
                 text='Подписка удалена',
@@ -157,6 +171,7 @@ async def successful_payment(message: types.Message, state: FSMContext):
         data['tg_id'] = message.chat.id
         data['type'] = data['type'][0]
         db_client.add_subscription(data)
+        logger.info(f'Making subscription ({data["type"]} {data["value"]})')
     await bot.send_message(message.chat.id, f"Платеж на сумму {message.successful_payment.total_amount // 100}"
                                             f" {message.successful_payment.currency} прошел успешно!\nПодписка оформлена!!")
     await state.finish()

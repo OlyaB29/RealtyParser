@@ -4,6 +4,12 @@ import re
 from PIL import Image, ImageChops
 from progress.bar import ChargingBar
 from colorama import init, Fore
+from loggers import sentry_logger
+import logging
+import traceback
+
+logger = logging.getLogger('db_client')
+logger.setLevel(logging.INFO)
 
 init(autoreset=True)
 
@@ -82,11 +88,15 @@ def images_comparison(img1, img2):
     image_2.thumbnail(size)
     try:
         result = ImageChops.difference(image_1, image_2).getbbox()
-    except ValueError:
+    except ValueError as e:
+        logger.exception(
+            f'{e}. (Comparing photos of different formats).\n')
         try:
             result = ImageChops.difference(image_1.convert('CMYK'), image_2.convert('CMYK')).getbbox()
         except Exception as e:
             print('Фото нельзя сравнить', e)
+            logger.exception(
+                f'{e}. (Uncomparable photos).\n')
             return False
     if result is None:
         return True
@@ -178,21 +188,22 @@ def check_flats_by_photo(flats, parser):
                 bar.next()
             bar.finish()
     if len(flats_to_insert):
-        insert_flats(flats_to_insert)
+        insert_flats(flats_to_insert, parser)
     if len(flats_to_update):
-        update_flats(flats_to_update, update_id_list)
+        update_flats(flats_to_update, update_id_list, parser)
     if len(image_links_list):
-        insert_photos(update_id_list, image_links_list)
+        insert_photos(update_id_list, image_links_list, parser)
 
 
-def update_flats(flats, flat_id_list):
+def update_flats(flats, flat_id_list, parser):
     flats_list = [
         (flat.link, flat.reference, flat.price, flat.title, flat.square, flat.city, flat.street, flat.district,
          flat.microdistrict, flat.rooms_number, flat.year, flat.description, flat.seller_number, flat.date,
          flat_id_list[counter]) for counter, flat in enumerate(flats)]
-    with psycopg.connect(dbname=DBNAME, user=USER, password=PASSWORD, host=HOST) as conn:
-        with conn.cursor() as cur:
-            cur.executemany('''
+    try:
+        with psycopg.connect(dbname=DBNAME, user=USER, password=PASSWORD, host=HOST) as conn:
+            with conn.cursor() as cur:
+                cur.executemany('''
                 UPDATE flats 
                 SET
                 link = %s,
@@ -211,16 +222,22 @@ def update_flats(flats, flat_id_list):
                 date = %s
                 WHERE id = %s
                  ''', flats_list)
+        logger.info(f'Number of updated flats from the site {parser}: {len(flats)}')
+    except (Exception, psycopg.DatabaseError) as error:
+        print("Ошибка обновления данных в таблице квартир", error)
+        logger.exception(
+            f'{error}. (Error updating flats from the site {parser}).\n')
 
 
-def insert_flats(flats):
+def insert_flats(flats, parser):
     flats_list = [
         (flat.link, flat.reference, flat.price, flat.title, flat.square, flat.city, flat.street, flat.district,
          flat.microdistrict, flat.rooms_number, flat.year, flat.description, flat.seller_number, flat.date)
         for flat in flats]
-    with psycopg.connect(dbname=DBNAME, user=USER, password=PASSWORD, host=HOST) as conn:
-        with conn.cursor() as cur:
-            cur.executemany('''
+    try:
+        with psycopg.connect(dbname=DBNAME, user=USER, password=PASSWORD, host=HOST) as conn:
+            with conn.cursor() as cur:
+                cur.executemany('''
                 INSERT INTO flats (link, reference, price, title, square, city, street, district,
                  microdistrict, rooms_number, year, description, seller_number, date) VALUES (%s, %s, %s, %s, %s, %s,
                   %s, %s, %s, %s, %s, %s, %s, %s)
@@ -241,17 +258,22 @@ def insert_flats(flats):
                 date = EXCLUDED.date
                 RETURNING id
                  ''', flats_list, returning=True)
-            id_list = [cur.fetchone()[0]]
-            i = 1
-            while i < len(flats_list):
-                cur.nextset()
-                id_list.append(cur.fetchone()[0])
-                i += 1
-    links_list = [flat.image_links for flat in flats]
-    insert_photos(id_list, links_list)
+                id_list = [cur.fetchone()[0]]
+                i = 1
+                while i < len(flats_list):
+                    cur.nextset()
+                    id_list.append(cur.fetchone()[0])
+                    i += 1
+        logger.info(f'Number of inserted flats from the site {parser}: {len(flats)}')
+        links_list = [flat.image_links for flat in flats]
+        insert_photos(id_list, links_list, parser)
+    except (Exception, psycopg.DatabaseError) as error:
+        print("Ошибка добавления данных в таблицу квартир", error)
+        logger.exception(
+            f'{error}. (Error inserting flats from the site {parser}).\n')
 
 
-def insert_photos(flat_id_list, image_links_list):
+def insert_photos(flat_id_list, image_links_list, parser):
     photos_list = [(flat_id_list[counter], link, psycopg.Binary(requests.get(link).content))
                    for counter, image_links in enumerate(image_links_list) for link in image_links]
     try:
@@ -263,6 +285,8 @@ def insert_photos(flat_id_list, image_links_list):
                          ''', photos_list)
     except (Exception, psycopg.DatabaseError) as error:
         print("Ошибка добавления данных в таблицу фото", error)
+        logger.exception(
+            f'{error}. (Error adding photos to the database from the site {parser}).\n')
 
 
 def get_all_not_posted_flats(parser_types):
@@ -290,8 +314,7 @@ def get_all_not_posted_flats(parser_types):
 
             return flats
 
-
-# get_all_not_posted_flats(['realt', 'gohome'])
+    # get_all_not_posted_flats(['realt', 'gohome'])
 
 
 def update_is_posted_state(id_list):
@@ -322,16 +345,17 @@ def update_is_archive_state(id_list):
             cur.execute('''
                     UPDATE flats 
                     SET is_archive = true
-                    WHERE id = ANY(%s)
+                    WHERE id = ANY(%s) 
                  ''',
                         [id_list, ]
                         )
 
 
 def add_subscription(subscription):
-    with psycopg2.connect(dbname=DBNAME, user=USER, password=PASSWORD, host=HOST) as conn:
-        with conn.cursor() as cur:
-            cur.execute('''
+    try:
+        with psycopg2.connect(dbname=DBNAME, user=USER, password=PASSWORD, host=HOST) as conn:
+            with conn.cursor() as cur:
+                cur.execute('''
                     INSERT INTO subscriptions (selection_field, selection_value) VALUES (%s, %s)
                     ON CONFLICT (selection_field, selection_value) DO UPDATE 
                     SET 
@@ -339,9 +363,11 @@ def add_subscription(subscription):
                     selection_value=EXCLUDED.selection_value
                     RETURNING id
                 ''', (subscription['type'], subscription['value']))
-            sub_id = cur.fetchone()[0]
-    print(sub_id)
-    add_subscriber(subscription['tg_id'], sub_id)
+                sub_id = cur.fetchone()[0]
+        add_subscriber(subscription['tg_id'], sub_id)
+    except (Exception, psycopg.DatabaseError) as error:
+        print("Ошибка добавления данных в таблицу фото", error)
+        logger.exception(f'{error}. (Error adding subscription to the database).\n')
 
 
 def add_subscriber(tg_id, sub_id):
@@ -383,8 +409,6 @@ def delete_subscriber(id):
             cur.execute('''
                      DELETE FROM subscribers WHERE id = %s                
                 ''', (id,))
-
-
 
 # create_flats_table()
 # create_photos_table()

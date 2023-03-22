@@ -6,10 +6,16 @@ from datetime import datetime
 from src.data import Flat
 from src import db_client
 from colorama import init, Fore
+from loggers import sentry_logger
+import logging
+import traceback
 
 init(autoreset=True)
 
 lock = threading.RLock()
+
+logger = logging.getLogger('base_parser')
+logger.setLevel(logging.INFO)
 
 
 class BaseParser(ABC):
@@ -28,8 +34,11 @@ class BaseParser(ABC):
         while self.start < self.page_to:
             resp = requests.get('{}{}'.format(self.main_link, self.start * self.n))
             html = BeautifulSoup(resp.content, 'html.parser')
-            for a in html.find_all('a', href=True, class_=self.a_class):
-                flat_links.append(a['href'])
+            try:
+                for a in html.find_all('a', href=True, class_=self.a_class):
+                    flat_links.append(a['href'])
+            except Exception as e:
+                logger.exception(f'{e}. (Search for flat links with a parser {self.parser_name}).\n')
             self.start += 1
 
         return flat_links
@@ -39,7 +48,7 @@ class BaseParser(ABC):
         return []
 
     @abstractmethod
-    def get_flat_characteristics(self, html, characteristics):
+    def get_flat_characteristics(self, html, characteristics, counter):
         return {}
 
     def enrich_links_to_flats(self, links):
@@ -54,7 +63,7 @@ class BaseParser(ABC):
             characteristics = {'title': '', 'price': 0, 'square': 0, 'city': '', 'street': '', 'district': '',
                                'microdistrict': '', 'rooms_number': 0, 'year': 0, 'description': '',
                                'date': datetime.now(), 'seller_number': '', 'image_links': []}
-            flat_characteristics = self.get_flat_characteristics(html, characteristics)
+            flat_characteristics = self.get_flat_characteristics(html, characteristics, counter)
 
             flats.append(Flat(
                 link=link,
@@ -75,6 +84,7 @@ class BaseParser(ABC):
             ))
             bar.next()
         bar.finish()
+        logger.info(f'Number of flats recieved from the site {self.parser_name}: {len(flats)}')
 
         return flats
 
@@ -82,8 +92,12 @@ class BaseParser(ABC):
         lock.acquire()
         try:
             db_client.check_flats_by_photo(flats, self.parser_name)
+            logger.info(f'Number of flats from the site {self.parser_name} added to the database: {len(flats)}')
         except Exception as e:
             print("Ошибка добавления данных в базу", e)
+            logger.exception(
+                f'{e}. (Error adding flats to the database from the site {self.parser_name}).\n')
+
         finally:
             lock.release()
 

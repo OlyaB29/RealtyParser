@@ -4,17 +4,23 @@ import requests
 from src import db_client
 from constants import ARCHIVE_AT
 from datetime import datetime
+from loggers import sentry_logger
+import logging
+
+logger = logging.getLogger('archive_logger')
+logger.setLevel(logging.INFO)
 
 
 def archive_irrelevant_flats():
     print(f'Архивирование началось: {datetime.now()}')
     flats = db_client.get_all_unarchived_flats()
-    print(flats)
+    logger.info(f'Total unarchived flats: {len(flats)}')
     flats_with_response = list(map(lambda el: (el[0], requests.get(el[1])), flats))
     flats_to_archive = list(
         filter(lambda el: el[1].status_code == 404 or (len(el[1].history) and el[1].history[0].status_code == 301),
                flats_with_response))
     db_client.update_is_archive_state(list(map(lambda el: el[0], flats_to_archive)))
+    logger.info(f'Number of flats added to the archive: {len(flats_to_archive)}')
 
 
 schedule.every().day.at(ARCHIVE_AT).do(archive_irrelevant_flats)

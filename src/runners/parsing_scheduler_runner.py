@@ -5,6 +5,7 @@ import threading
 from datetime import datetime
 
 
+
 def parse_all():
     print(f'Парсинг начался: {datetime.now()}')
     for parser in USED_PARSERS:
