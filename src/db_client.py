@@ -7,6 +7,9 @@ from colorama import init, Fore
 from loggers import sentry_logger
 import logging
 import traceback
+import newrelic.agent
+
+newrelic.agent.initialize('E:\Olya Work\\Users\oabor\PycharmProjects\RealtyParser\\newrelic.ini')
 
 logger = logging.getLogger('db_client')
 logger.setLevel(logging.INFO)
@@ -334,7 +337,7 @@ def get_all_unarchived_flats():
         with conn.cursor() as cur:
             cur.execute('''
                     SELECT id, link FROM flats 
-                    WHERE (is_archive = false or is_archive IS NULL)
+                    WHERE (is_archive = false or is_archive IS NULL) LIMIT 10
                  ''')
             return cur.fetchall()
 

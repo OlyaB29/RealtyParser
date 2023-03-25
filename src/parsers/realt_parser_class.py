@@ -4,9 +4,12 @@ from datetime import datetime
 from loggers import sentry_logger
 import logging
 import traceback
+import newrelic.agent
 
 logger = logging.getLogger('realt_parser')
 logger.setLevel(logging.INFO)
+
+newrelic.agent.initialize('E:\Olya Work\\Users\oabor\PycharmProjects\RealtyParser\\newrelic.ini')
 
 
 class RealtParser(BaseParser):

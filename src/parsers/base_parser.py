@@ -9,10 +9,15 @@ from colorama import init, Fore
 from loggers import sentry_logger
 import logging
 import traceback
+import newrelic.agent
 
 init(autoreset=True)
 
 lock = threading.RLock()
+
+
+newrelic.agent.initialize('E:\Olya Work\\Users\oabor\PycharmProjects\RealtyParser\\newrelic.ini')
+
 
 logger = logging.getLogger('base_parser')
 logger.setLevel(logging.INFO)
@@ -102,6 +107,6 @@ class BaseParser(ABC):
             lock.release()
 
     def update_with_last_flats(self):
-        links = self.get_ready_links()[:10]
+        links = self.get_ready_links()[:5]
         flats = self.enrich_links_to_flats(links)
         self.save_flats(flats)

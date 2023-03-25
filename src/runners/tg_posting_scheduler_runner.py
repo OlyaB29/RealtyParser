@@ -7,6 +7,9 @@ from src.bots import tg_poster
 from datetime import datetime
 from loggers import sentry_logger
 import logging
+import newrelic.agent
+
+newrelic.agent.initialize('E:\Olya Work\\Users\oabor\PycharmProjects\RealtyParser\\newrelic.ini')
 
 logger = logging.getLogger('tg_posting')
 logger.setLevel(logging.INFO)
@@ -45,7 +48,7 @@ def do_post_in_telegram():
 
 def send_messages(posts, chat_id_list):
     for post in posts:
-        post_message = post[1]+'\n'
+        post_message = post[1] + '\n'
         post_message += '<b>Цена:</b>'
         if post[3] == 0:
             post_message += ' договорная\n'
@@ -58,7 +61,17 @@ def send_messages(posts, chat_id_list):
             time.sleep(5)
 
 
-schedule.every(POST_EVERY_MINUTES).minutes.do(do_post_in_telegram)
+def execute_task(application, task_name):
+    with newrelic.agent.BackgroundTask(application, name=task_name, group='Task'):
+        do_post_in_telegram()
+
+
+def run_posting():
+    execute_task(newrelic.agent.register_application(timeout=0.2), "posting")
+
+
+# schedule.every(POST_EVERY_MINUTES).minutes.do(do_post_in_telegram)
+schedule.every(POST_EVERY_MINUTES).minutes.do(run_posting)
 
 while True:
     schedule.run_pending()

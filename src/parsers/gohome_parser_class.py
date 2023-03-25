@@ -4,6 +4,9 @@ from datetime import datetime
 from loggers import sentry_logger
 import logging
 import traceback
+import newrelic.agent
+
+newrelic.agent.initialize('E:\Olya Work\\Users\oabor\PycharmProjects\RealtyParser\\newrelic.ini')
 
 logger = logging.getLogger('gohome_parser')
 logger.setLevel(logging.INFO)

@@ -7,6 +7,9 @@ from src import db_client
 from config import subscriber_TOKEN, UKassa_TOKEN
 from loggers import sentry_logger
 import logging
+import newrelic.agent
+
+newrelic.agent.initialize('E:\Olya Work\\Users\oabor\PycharmProjects\RealtyParser\\newrelic.ini')
 
 logger = logging.getLogger('tg_subscriber')
 logger.setLevel(logging.INFO)
@@ -178,4 +181,10 @@ async def successful_payment(message: types.Message, state: FSMContext):
 
 
 if __name__ == "__main__":
-    executor.start_polling(dp, skip_updates=False)
+    # executor.start_polling(dp, skip_updates=False)
+    def execute_task(application, task_name):
+        with newrelic.agent.BackgroundTask(application, name=task_name, group='Task'):
+            executor.start_polling(dp, skip_updates=False)
+
+    execute_task(newrelic.agent.register_application(timeout=0.2), "subscribe")
+

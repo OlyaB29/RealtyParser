@@ -6,6 +6,9 @@ from constants import ARCHIVE_AT
 from datetime import datetime
 from loggers import sentry_logger
 import logging
+import newrelic.agent
+
+newrelic.agent.initialize('E:\Olya Work\\Users\oabor\PycharmProjects\RealtyParser\\newrelic.ini')
 
 logger = logging.getLogger('archive_logger')
 logger.setLevel(logging.INFO)
@@ -23,9 +26,21 @@ def archive_irrelevant_flats():
     logger.info(f'Number of flats added to the archive: {len(flats_to_archive)}')
 
 
-schedule.every().day.at(ARCHIVE_AT).do(archive_irrelevant_flats)
+def execute_task(application, task_name):
+    with newrelic.agent.BackgroundTask(application, name=task_name, group='Task'):
+        archive_irrelevant_flats()
 
+def run_archiving():
+    execute_task(newrelic.agent.register_application(timeout=0.2), "archive")
+
+# execute_task(newrelic.agent.register_application(timeout=0.2), "archive")
+
+# schedule.every().day.at(ARCHIVE_AT).do(archive_irrelevant_flats)
+schedule.every().day.at(ARCHIVE_AT).do(run_archiving)
+#
 while True:
     schedule.run_pending()
     time.sleep(1)
+
+
 # archive_irrelevant_flats()
